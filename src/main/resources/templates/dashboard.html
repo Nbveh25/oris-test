@@ -186,30 +186,6 @@
             transform: none;
         }
 
-        .btn-secondary {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-        }
-
-        .btn-secondary:hover {
-            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.3);
-        }
-
-        .btn-info {
-            background: linear-gradient(135deg, #17a2b8 0%, #20c997 100%);
-        }
-
-        .btn-info:hover {
-            box-shadow: 0 8px 25px rgba(23, 162, 184, 0.3);
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
-        }
-
-        .btn-danger:hover {
-            box-shadow: 0 8px 25px rgba(220, 53, 69, 0.3);
-        }
-
         .action-buttons {
             display: flex;
             flex-wrap: wrap;
@@ -347,9 +323,6 @@
                     <div class="text-muted">Следующая отправка: завтра в 9:00</div>
                     <div class="action-buttons">
                         <button onclick="testEmail()" class="btn">Тестировать рассылку</button>
-                        <button onclick="testSmtp()" class="btn btn-secondary">Тест SMTP</button>
-                        <button onclick="testNetwork()" class="btn btn-info">Проверить сеть</button>
-                        <button onclick="logout()" class="btn btn-danger">Выйти</button>
                     </div>
                 </div>
             </div>
@@ -430,51 +403,6 @@
                 .catch(error => {
                     alert('Ошибка при тестировании рассылки');
                 });
-        }
-        
-        function testSmtp() {
-            fetch('/api/authentication/test-smtp', {
-                method: 'POST',
-                credentials: 'include'
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.message) {
-                        alert('SMTP тест запущен! ' + data.message);
-                    } else {
-                        alert('Ошибка SMTP: ' + (data.error || 'Неизвестная ошибка'));
-                    }
-                })
-                .catch(error => {
-                    alert('Ошибка при тестировании SMTP');
-                });
-        }
-        
-        function testNetwork() {
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Проверка...';
-
-            fetch('/api/authentication/test-network', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showNotification('success', data.message);
-                } else {
-                    showNotification('error', data.message + (data.suggestion ? '\n\nРекомендация: ' + data.suggestion : ''));
-                }
-            })
-            .catch(error => {
-                console.error('Ошибка:', error);
-                showNotification('error', '❌ Ошибка при проверке сетевого соединения');
-            })
-            .finally(() => {
-                button.disabled = false;
-                button.textContent = originalText;
-            });
         }
         
         async function logout() {
