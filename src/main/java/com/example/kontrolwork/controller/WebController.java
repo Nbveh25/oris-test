@@ -40,7 +40,6 @@ public class WebController {
     public String dashboard() {
         logger.debug("Переход на страницу дашборда");
         
-        // Проверяем, аутентифицирован ли пользователь
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || 
             authentication instanceof AnonymousAuthenticationToken) {

@@ -21,7 +21,6 @@ public class DataInitializer implements CommandLineRunner {
         logger.info("Начало инициализации данных приложения");
         
         try {
-            // Создаем роли если их нет
             if (roleRepository.findByName(ERole.ROLE_USER).isEmpty()) {
                 roleRepository.save(new Role(ERole.ROLE_USER));
                 logger.info("Создана роль ROLE_USER");
