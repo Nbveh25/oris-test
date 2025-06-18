@@ -16,8 +16,8 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    // Временно отключаем отправку для тестирования
-    private static final boolean EMAIL_ENABLED = false;
+    // Включаем отправку email
+    private static final boolean EMAIL_ENABLED = true;
 
     public void sendCurrencyRatesEmail(String to, String subject, String content) {
         if (!EMAIL_ENABLED) {
@@ -25,18 +25,26 @@ public class EmailService {
             return;
         }
         
+        logger.info("Начинаем отправку email на {} с темой: {}", to, subject);
+        
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
+            helper.setFrom("b.f.g@internet.ru");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, false);
 
+            logger.info("Отправляем email через SMTP...");
             mailSender.send(message);
-            logger.info("Email с курсами валют отправлен на: {}", to);
+            logger.info("✅ Email с курсами валют успешно отправлен на: {}", to);
         } catch (MessagingException e) {
-            logger.error("Ошибка при отправке email на {}: {}", to, e.getMessage());
+            logger.error("❌ Ошибка MessagingException при отправке email на {}: {}", to, e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки email: " + e.getMessage(), e);
+        } catch (Exception e) {
+            logger.error("❌ Общая ошибка при отправке email на {}: {}", to, e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки email: " + e.getMessage(), e);
         }
     }
 
@@ -61,6 +69,7 @@ public class EmailService {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
+            helper.setFrom("b.f.g@internet.ru");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(content, false);

@@ -74,4 +74,10 @@ public class CurrencyEmailScheduler {
         
         return content.toString();
     }
+
+    // Публичный метод для тестирования рассылки
+    public void sendTestEmail() {
+        logger.info("Отправка тестовой рассылки курсов валют...");
+        sendDailyCurrencyRates();
+    }
 }

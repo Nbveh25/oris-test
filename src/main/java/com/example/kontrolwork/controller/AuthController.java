@@ -8,6 +8,7 @@ import com.example.kontrolwork.model.User;
 import com.example.kontrolwork.repository.RoleRepository;
 import com.example.kontrolwork.repository.UserRepository;
 import com.example.kontrolwork.service.EmailService;
+import com.example.kontrolwork.scheduler.CurrencyEmailScheduler;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
@@ -53,6 +54,9 @@ public class AuthController {
 
     @Autowired
     EmailService emailService;
+
+    @Autowired
+    CurrencyEmailScheduler currencyEmailScheduler;
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest, 
@@ -286,5 +290,73 @@ public class AuthController {
         Map<String, String> response = new HashMap<>();
         response.put("message", "Контроллер работает");
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/test-email")
+    public ResponseEntity<?> testEmailSending() {
+        logger.info("Тестирование отправки email рассылки");
+        
+        try {
+            currencyEmailScheduler.sendTestEmail();
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Тестовая рассылка запущена. Проверьте логи.");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Ошибка при тестировании email рассылки: {}", e.getMessage(), e);
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Ошибка при отправке email: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+    @PostMapping("/test-smtp")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> testSmtpConnection() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Тестируем соединение с SMTP сервером
+            emailService.sendCurrencyRatesEmail("tima.bikmukhametov@inbox.ru", "Test", "Тестовое письмо для проверки соединения");
+            response.put("success", true);
+            response.put("message", "✅ SMTP соединение установлено успешно!");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("❌ Ошибка SMTP соединения: ", e);
+            response.put("success", false);
+            response.put("message", "❌ Ошибка SMTP: " + e.getMessage());
+            response.put("error", e.getClass().getSimpleName());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    @PostMapping("/test-network")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> testNetworkConnection() {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            // Проверяем сетевое соединение
+            java.net.Socket socket = new java.net.Socket();
+            socket.connect(new java.net.InetSocketAddress("smtp.internet.ru", 587), 10000);
+            socket.close();
+            
+            response.put("success", true);
+            response.put("message", "✅ Сетевое соединение с smtp.internet.ru:587 успешно!");
+            return ResponseEntity.ok(response);
+        } catch (java.net.SocketTimeoutException e) {
+            response.put("success", false);
+            response.put("message", "❌ Таймаут подключения к smtp.internet.ru:587. Возможно, порт заблокирован.");
+            response.put("suggestion", "Попробуйте отключить антивирус/файрвол или обратитесь к провайдеру");
+            return ResponseEntity.status(500).body(response);
+        } catch (java.net.ConnectException e) {
+            response.put("success", false);
+            response.put("message", "❌ Невозможно подключиться к smtp.internet.ru:587. Сервер недоступен.");
+            return ResponseEntity.status(500).body(response);
+        } catch (Exception e) {
+            logger.error("❌ Ошибка сетевого соединения: ", e);
+            response.put("success", false);
+            response.put("message", "❌ Сетевая ошибка: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
     }
 }
