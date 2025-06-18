@@ -30,8 +30,7 @@ public class WebSecurityConfig {
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
         return (web) -> web.ignoring()
-            .requestMatchers("/api/authentication/**")
-            .requestMatchers("/api/currency/**");
+            .requestMatchers("/css/**", "/js/**", "/images/**");
     }
 
     @Bean
@@ -62,25 +61,36 @@ public class WebSecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                .maximumSessions(1)
+                .maxSessionsPreventsLogin(false))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/h2-console/**").permitAll()
                 .requestMatchers("/", "/home", "/register", "/login").permitAll()
+                .requestMatchers("/api/authentication/login", "/api/authentication/signup").permitAll()
+                .requestMatchers("/api/currency/**").permitAll()
                 .requestMatchers("/css/**", "/js/**", "/images/**").permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(exceptions -> exceptions
                 .authenticationEntryPoint((request, response, authException) -> {
-                    response.sendRedirect("/login");
+                    // Если запрос к API, возвращаем 401
+                    if (request.getRequestURI().startsWith("/api/")) {
+                        response.setStatus(401);
+                        response.setContentType("application/json");
+                        response.getWriter().write("{\"error\":\"Требуется аутентификация\"}");
+                    } else {
+                        // Для обычных страниц перенаправляем на логин
+                        response.sendRedirect("/login");
+                    }
                 }));
 
-        // Полностью отключаем любые стандартные механизмы аутентификации
+        // Отключаем стандартные формы логина, но оставляем сессионную аутентификацию
         http.formLogin(form -> form.disable());
         http.httpBasic(basic -> basic.disable());
-        http.rememberMe(remember -> remember.disable());
-
+        
         http.authenticationProvider(authenticationProvider());
 
-        // Для консоли (если используется H2)
+        // Для консоли H2 (если используется)
         http.headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()));
         
         logger.info("Цепочка фильтров безопасности настроена успешно");

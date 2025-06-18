@@ -11,6 +11,7 @@ import com.example.kontrolwork.service.EmailService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import java.util.Set;
 
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
@@ -107,11 +109,14 @@ public class AuthController {
             SecurityContextHolder.getContext().setAuthentication(authentication);
             logger.trace("Контекст безопасности установлен");
             
-            // Сохраняем контекст безопасности в сессии
+            // Создаем или получаем сессию и сохраняем контекст безопасности
             HttpSession session = request.getSession(true);
             logger.trace("Сессия создана/получена: {}", session.getId());
-            session.setAttribute("SPRING_SECURITY_CONTEXT", SecurityContextHolder.getContext());
-            logger.trace("Контекст безопасности сохранен в сессии");
+            
+            // Правильное сохранение контекста безопасности в сессии
+            session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, 
+                                SecurityContextHolder.getContext());
+            logger.trace("Контекст безопасности сохранен в сессии с правильным ключом");
             
             logger.trace("Ищем пользователя в базе данных...");
             User user = userRepository.findByEmail(cleanEmail)
@@ -199,32 +204,54 @@ public class AuthController {
     }
 
     @GetMapping("/user")
-    public ResponseEntity<?> getCurrentUser(Principal principal) {
-        if (principal == null) {
-            logger.warn("Попытка получения данных пользователя без авторизации");
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Пользователь не авторизован");
-            return ResponseEntity.status(401).body(error);
-        }
-
+    public ResponseEntity<?> getCurrentUser(HttpServletRequest request) {
+        logger.info("=== ПОЛУЧЕНИЕ ИНФОРМАЦИИ О ТЕКУЩЕМ ПОЛЬЗОВАТЕЛЕ ===");
+        
         try {
-            User user = userRepository.findByEmail(principal.getName())
+            // Получаем контекст безопасности из сессии
+            HttpSession session = request.getSession(false);
+            if (session == null) {
+                logger.warn("Сессия не найдена");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Не авторизован"));
+            }
+            
+            logger.trace("Сессия найдена: {}", session.getId());
+            
+            // Получаем аутентификацию из контекста безопасности
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated() || 
+                authentication instanceof AnonymousAuthenticationToken) {
+                logger.warn("Пользователь не аутентифицирован");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Не авторизован"));
+            }
+            
+            logger.trace("Аутентификация найдена: {}", authentication);
+            logger.trace("Principal: {}", authentication.getPrincipal());
+            
+            String email = authentication.getName();
+            logger.trace("Email из аутентификации: '{}'", email);
+            
+            User user = userRepository.findByEmail(email)
                     .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
-
-            logger.debug("Получение данных пользователя: {}", principal.getName());
-
+            
+            logger.trace("Пользователь найден в базе данных: {}", user.getEmail());
+            
             Map<String, Object> response = new HashMap<>();
+            response.put("id", user.getId());
             response.put("email", user.getEmail());
             response.put("firstName", user.getFirstName());
             response.put("lastName", user.getLastName());
             response.put("subscribeToRates", user.isSubscribeToRates());
-
+            response.put("emailVerified", user.isEmailVerified());
+            
+            logger.info("Информация о пользователе '{}' успешно получена", email);
+            logger.info("=== КОНЕЦ ПОЛУЧЕНИЯ ИНФОРМАЦИИ О ПОЛЬЗОВАТЕЛЕ ===");
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            logger.error("Ошибка при получении данных пользователя {}: {}", principal.getName(), e.getMessage());
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Ошибка при получении данных пользователя");
-            return ResponseEntity.status(500).body(error);
+            logger.error("Ошибка при получении информации о пользователе: {}", e.getMessage(), e);
+            logger.info("=== КОНЕЦ ПОЛУЧЕНИЯ ИНФОРМАЦИИ О ПОЛЬЗОВАТЕЛЕ (ОШИБКА) ===");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Внутренняя ошибка сервера"));
         }
     }
 
